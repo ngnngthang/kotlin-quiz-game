@@ -22,15 +22,21 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
+import com.example.quiz.model.optionsA
+import com.example.quiz.model.optionsB
+import com.example.quiz.model.optionsC
+import com.example.quiz.model.questions
 import com.example.quiz.ui.theme.DarkText
 import com.example.quiz.ui.theme.LightText
 import com.example.quiz.ui.theme.Primary
@@ -41,14 +47,45 @@ import com.example.quiz.ui.theme.Purple80
 fun QuizScreen(navController: NavHostController) {
 
 
-    val selectedAnswer = remember { mutableStateOf<String?>(null) }
-    val answers = listOf("Ottawa", "Toronto", "Vancouver", "Montreal")
+    val currentQuestion = remember { mutableIntStateOf(0) }
+    val questionIndexes = remember { mutableStateOf(mutableListOf<Int>()) }
+    val randomIndexes = remember { mutableStateOf(mutableListOf<Int>()) }
 
-    fun onSelectAnswer(answer: String) {
-        println("Selecting answer: $answer")
-        selectedAnswer.value = answer
-        println("Selected answer: ${selectedAnswer.value}")
+
+    fun generateRandomQuestions() {
+        for (i in 0..20) {
+            randomIndexes.value.add(i)
+        }
+        randomIndexes.value.shuffle()
+        questionIndexes.value = randomIndexes.value
     }
+
+    generateRandomQuestions()
+
+
+    val selectedAnswers = remember { mutableStateOf(mutableListOf<String>()) }
+
+    fun onSelectAnswer(answer: String, questionIndex: Int) {
+        println("Selecting answer: $answer")
+        selectedAnswers.value[questionIndex] = answer
+        println("Selected answer: ${selectedAnswers.value[questionIndex]}")
+    }
+
+    fun onNextQuestion() {
+        if (currentQuestion.intValue < 4) {
+            currentQuestion.value += 1
+        } else {
+            // Navigate to results screen
+        }
+    }
+
+    fun onPreviousQuestion() {
+        if (currentQuestion.intValue > 0) {
+            currentQuestion.value -= 1
+        }
+    }
+
+
 
     Scaffold(
         modifier = Modifier
@@ -56,7 +93,7 @@ fun QuizScreen(navController: NavHostController) {
             TopAppBar(
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    titleContentColor = LightText,
+                    titleContentColor = DarkText,
                 ),
                 title = {
                     Text("Quiz", fontSize = 20.sp, fontWeight = FontWeight(600))
@@ -91,22 +128,39 @@ fun QuizScreen(navController: NavHostController) {
                 verticalArrangement = Arrangement.Center,
             ) {
                 Text(
-                    "Question 1",
+                    "Question ${currentQuestion.intValue + 1}",
+                    textAlign = TextAlign.Center,
                     fontSize = 20.sp, fontWeight = FontWeight(500), color = DarkText
                 )
                 Spacer(modifier = Modifier.padding(20.dp))
                 Text(
-                    "What is the capital of Canada?",
+                    questions[currentQuestion.intValue],
                     fontSize = 24.sp, fontWeight = FontWeight(500), color = DarkText
                 )
                 Spacer(modifier = Modifier.padding(20.dp))
-                answers.forEach { answer ->
-                    AnswerButton(
-                        answer = answer,
-                        isSelected = selectedAnswer.value == answer,
-                        onClick = { onSelectAnswer(answer) }
-                    )
-                    Spacer(modifier = Modifier.padding(10.dp))
+
+                questionIndexes.value.forEach { idx ->
+                    Column {
+                        AnswerButton(
+                            answer = optionsA[currentQuestion.intValue],
+                            isSelected = selectedAnswers.value[idx] == optionsA[currentQuestion.intValue],
+                            onClick = { onSelectAnswer(optionsA[currentQuestion.intValue], idx) }
+                        )
+                        Spacer(modifier = Modifier.padding(10.dp))
+                        AnswerButton(
+                            answer = optionsB[currentQuestion.intValue],
+                            isSelected = selectedAnswers.value[idx] == optionsB[currentQuestion.intValue],
+                            onClick = { onSelectAnswer(optionsB[currentQuestion.intValue], idx) }
+                        )
+                        Spacer(modifier = Modifier.padding(10.dp))
+                        AnswerButton(
+                            answer = optionsC[currentQuestion.intValue],
+                            isSelected = selectedAnswers.value[idx] == optionsC[currentQuestion.intValue],
+                            onClick = { onSelectAnswer(optionsC[currentQuestion.intValue], idx) }
+                        )
+                        Spacer(modifier = Modifier.padding(10.dp))
+
+                    }
                 }
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -122,7 +176,9 @@ fun QuizScreen(navController: NavHostController) {
                             contentColor = DarkText
                         ),
                         border = BorderStroke(width = 1.dp, color = DarkText),
-                        onClick = {}
+                        onClick = {
+                            onPreviousQuestion()
+                        }
                     ) {
                         Text("Back", fontSize = 16.sp, fontWeight = FontWeight(400))
                     }
@@ -137,7 +193,9 @@ fun QuizScreen(navController: NavHostController) {
                             contentColor = LightText
                         ),
                         border = BorderStroke(width = 1.dp, color = Primary),
-                        onClick = {}
+                        onClick = {
+                            onNextQuestion()
+                        }
                     ) {
                         Text("Next", fontSize = 16.sp, fontWeight = FontWeight(400))
                     }
