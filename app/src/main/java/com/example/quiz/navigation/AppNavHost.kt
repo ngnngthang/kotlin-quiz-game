@@ -24,8 +24,11 @@ fun AppNavHost(navController: NavHostController) {
         composable("quiz") {
             QuizScreen(navController = navController)
         }
-        composable("score") {
-            ScoreScreen(navController = navController)
+        composable("score/{score}/{totalQuestions}") { backStackEntry ->
+            // Get score and totalQuestions from arguments and convert to Int
+            val score = backStackEntry.arguments?.getString("score")?.toInt() ?: 0
+            val totalQuestions = backStackEntry.arguments?.getString("totalQuestions")?.toInt() ?: 0
+            ScoreScreen(navController = navController, score = score, totalQuestions = totalQuestions)
         }
     }
 }
