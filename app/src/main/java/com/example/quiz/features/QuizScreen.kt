@@ -53,14 +53,8 @@ fun QuizScreen(navController: NavHostController) {
 
 
     fun generateRandomQuestions() {
-        for (i in 0..20) {
-            randomIndexes.value.add(i)
-        }
-        randomIndexes.value.shuffle()
-        questionIndexes.value = randomIndexes.value
-    }
 
-    generateRandomQuestions()
+    }
 
 
     val selectedAnswers = remember { mutableStateOf(mutableListOf<String>()) }
@@ -112,8 +106,7 @@ fun QuizScreen(navController: NavHostController) {
                         )
                     }
                 },
-
-                )
+            )
         }
     ) { innerPadding ->
         Column {
