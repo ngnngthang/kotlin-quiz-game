@@ -130,9 +130,10 @@ fun QuizScreen(navController: NavHostController) {
         choices[questions.indexOf(randomQuestions[index])].shuffled() // Shuffle the answers for each question
     }
     val randomCorrectAnswers = randomQuestions.mapIndexed { index, _ ->
-        val originalCorrectIndex = correctAnswers[questions.indexOf(randomQuestions[index])]
-        randomChoices[index].indexOf(choices[questions.indexOf(randomQuestions[index])][originalCorrectIndex - 1]) + 1
-        }
+        val originalCorrectIndex = correctAnswers[questions.indexOf(randomQuestions[index])] - 1
+        val correctAnswer = choices[questions.indexOf(randomQuestions[index])][originalCorrectIndex]
+        randomChoices[index].indexOf(correctAnswer) + 1 // Add 1 to match your 1-based index
+    }
 
     // Track the current question index and the user's score
     val currentQuestionIndex = remember { mutableStateOf(0) }
@@ -153,12 +154,20 @@ fun QuizScreen(navController: NavHostController) {
 
     val timer = remember { mutableStateOf<CountDownTimer?>(null) }
 
+    // Add this to your QuizScreen composable
+    val userAnswers = remember { mutableStateOf<List<String?>>(List(randomQuestions.size) { null }) }
+
     // Function to go to the next question
     val goToNextQuestion: () -> Unit = {
         if (selectedAnswer.value != null || timeLeft.value == 0) {
+
+            userAnswers.value = userAnswers.value.toMutableList().apply {
+                this[currentQuestionIndex.value] = selectedAnswer.value
+            }
+
             // Check if the selected answer is correct
-            val correctAnswerIndex = randomCorrectAnswers[currentQuestionIndex.value]
-            if (randomChoices[currentQuestionIndex.value].indexOf(selectedAnswer.value) + 1 == correctAnswerIndex) {
+            val correctAnswerIndex = randomCorrectAnswers[currentQuestionIndex.value] - 1 // Convert to 0-based index
+            if (randomChoices[currentQuestionIndex.value].indexOf(selectedAnswer.value) == correctAnswerIndex) {
                 score.value += 1
             }
             // Go to the next question
@@ -169,7 +178,18 @@ fun QuizScreen(navController: NavHostController) {
             } else {
                 // End of quiz, save score and navigate to results screen
                 saveScore(context = context, score.value)
-                navController.navigate("score/${score.value}/${randomQuestions.size}")
+
+                // Serialize questions and choices
+                val serializedRandomQuestions = randomQuestions.joinToString("|")
+                val serializedRandomChoices = randomChoices.joinToString("|") { it.joinToString(",") }
+
+                // Navigate to ScoreScreen with all required arguments
+                navController.navigate(
+                    "score/${score.value}/${randomQuestions.size}/" +
+                            "${userAnswers.value.joinToString("|")}/" +
+                            "${randomCorrectAnswers.joinToString("|")}/" +
+                            "$serializedRandomQuestions/$serializedRandomChoices"
+                )
                 quizEnded.value = true
             }
         }
@@ -199,7 +219,8 @@ fun QuizScreen(navController: NavHostController) {
 
     Scaffold(
         modifier = Modifier
-            .fillMaxWidth(), topBar = {
+            .fillMaxWidth(),containerColor = colorsList[currentQuestionIndex.value % colorsList.size],
+        topBar = {
             TopAppBar(
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.primaryContainer,
@@ -249,11 +270,13 @@ fun QuizScreen(navController: NavHostController) {
                 Spacer(modifier = Modifier.padding(20.dp))
 
                 // Display answer choices
+                val questionColor = colorsList[currentQuestionIndex.value % colorsList.size]
                 randomChoices[currentQuestionIndex.value].forEach { answer ->
                     AnswerButton(
                         answer = answer,
                         isSelected = selectedAnswer.value == answer,
-                        onClick = { selectedAnswer.value = answer }
+                        onClick = { selectedAnswer.value = answer },
+                        buttonColor = questionColor
                     )
                     Spacer(modifier = Modifier.padding(10.dp))
                 }
@@ -287,7 +310,7 @@ fun QuizScreen(navController: NavHostController) {
 }
 
 @Composable
-fun AnswerButton(answer: String, isSelected: Boolean, onClick: () -> Unit) {
+fun AnswerButton(answer: String, isSelected: Boolean, onClick: () -> Unit, buttonColor: Color) {
     Button(
         onClick = onClick,
         modifier = Modifier
@@ -296,7 +319,7 @@ fun AnswerButton(answer: String, isSelected: Boolean, onClick: () -> Unit) {
         shape = RoundedCornerShape(8.dp),
         border = BorderStroke(width = 1.dp, color = if (isSelected) Purple80 else DarkText),
         colors = ButtonDefaults.buttonColors(
-            containerColor = if (isSelected) Purple80 else Color.Transparent,
+            containerColor = if (isSelected) Purple80 else buttonColor, // Change background color here
             contentColor = DarkText
         )
     ) {

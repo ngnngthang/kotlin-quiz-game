@@ -24,11 +24,28 @@ fun AppNavHost(navController: NavHostController) {
         composable("quiz") {
             QuizScreen(navController = navController)
         }
-        composable("score/{score}/{totalQuestions}") { backStackEntry ->
-            // Get score and totalQuestions from arguments and convert to Int
+        composable(
+            "score/{score}/{totalQuestions}/{userAnswers}/{correctAnswers}/{randomQuestions}/{randomChoices}"
+        ) { backStackEntry ->
+            // Get arguments from the navigation route
             val score = backStackEntry.arguments?.getString("score")?.toInt() ?: 0
             val totalQuestions = backStackEntry.arguments?.getString("totalQuestions")?.toInt() ?: 0
-            ScoreScreen(navController = navController, score = score, totalQuestions = totalQuestions)
+            val userAnswers = backStackEntry.arguments?.getString("userAnswers") ?: ""
+            val correctAnswers = backStackEntry.arguments?.getString("correctAnswers") ?: ""
+            val randomQuestions = backStackEntry.arguments?.getString("randomQuestions") ?: ""
+            val randomChoices = backStackEntry.arguments?.getString("randomChoices") ?: ""
+
+
+            // Pass all arguments to ScoreScreen
+            ScoreScreen(
+                navController = navController,
+                score = score,
+                totalQuestions = totalQuestions,
+                userAnswers = userAnswers,
+                correctAnswers = correctAnswers,
+                randomQuestions = randomQuestions,
+                randomChoices = randomChoices
+            )
         }
     }
 }
