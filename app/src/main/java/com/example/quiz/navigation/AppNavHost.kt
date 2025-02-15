@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import com.example.quiz.features.LatestScoreScreen
 import com.example.quiz.features.MainScreen
 import com.example.quiz.features.QuizScreen
 import com.example.quiz.features.ScoreScreen
@@ -23,6 +24,9 @@ fun AppNavHost(navController: NavHostController) {
         }
         composable("quiz") {
             QuizScreen(navController = navController)
+        }
+        composable("latestScore") {
+            LatestScoreScreen(navController = navController)
         }
         composable(
             "score/{score}/{totalQuestions}/{userAnswers}/{correctAnswers}/{randomQuestions}/{randomChoices}"

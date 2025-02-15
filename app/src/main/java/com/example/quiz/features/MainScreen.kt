@@ -14,13 +14,9 @@ import androidx.compose.material3.ButtonColors
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
@@ -34,11 +30,6 @@ import com.example.quiz.ui.theme.Primary
 
 @Composable
 fun MainScreen(navController: NavHostController) {
-    val context = LocalContext.current
-    val showScore = remember { mutableStateOf(false) }
-    val lastScore = remember { mutableStateOf(0) }
-    val isPlayed = remember { mutableStateOf(false) }
-
     fun onStart() {
         navController.navigate("quiz")
     }
@@ -47,14 +38,10 @@ fun MainScreen(navController: NavHostController) {
         navController.popBackStack()
     }
 
-    fun toggleViewScore() {
-        showScore.value = !showScore.value
+    fun viewLatestScore() {
+        navController.navigate("latestScore")
     }
 
-    LaunchedEffect(Unit) {
-        isPlayed.value = getIsPlayed(context)  // Check if the quiz has been played
-        lastScore.value = getLastScore(context)  // Retrieve the score
-    }
 
     Box(
         modifier = Modifier
@@ -104,23 +91,13 @@ fun MainScreen(navController: NavHostController) {
                 contentPadding = PaddingValues(16.dp),
                 shape = MaterialTheme.shapes.medium,
                 onClick = {
-                    toggleViewScore() // Fetch the score on click
+                    viewLatestScore() // Fetch the score on click
                 }
             ) {
                 Text(
                     "SHOW SCORE",
                     fontSize = 28.sp,
                     fontFamily = FontFamily(Font(R.font.jersey10_regular))
-                )
-            }
-            // Display the last score
-            if (showScore.value) {
-                Text(
-                    text = "Your Latest Score: ${lastScore.value}",
-                    fontSize = 28.sp,
-                    fontFamily = FontFamily(Font(R.font.jersey10_regular)),
-                    color = DarkText,
-                    modifier = Modifier.padding(16.dp)
                 )
             }
             // Back Button
