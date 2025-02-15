@@ -1,14 +1,15 @@
 package com.example.quiz.features
 
+import android.util.Log
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowLeft
@@ -16,30 +17,38 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.NavHostController
+import com.example.quiz.R
 import com.example.quiz.ui.theme.DarkText
+import com.example.quiz.ui.theme.Green
 import com.example.quiz.ui.theme.LightText
-import com.example.quiz.ui.theme.Primary
-import com.example.quiz.ui.theme.Purple80
-import androidx.compose.ui.platform.LocalContext
-import android.os.CountDownTimer
-import androidx.compose.runtime.LaunchedEffect
-
-
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.flow
 
 
 // Data for 20 questions
@@ -113,127 +122,142 @@ val correctAnswers = listOf(
 )
 
 val colorsList = listOf(
-    Color(0xFFffccbc),  // Light Pink
     Color(0xFFbbdefb),  // Light Blue
+    Color(0xFFf28482),  // Light Yellow
     Color(0xFFc8e6c9),  // Light Green
-    Color(0xFFfff9c4),  // Light Yellow
-    Color(0xFFf8bbd0),  // Light Purple
+    Color(0xFFf07167),  // Light Purple
     // Add more colors if you have more than 4 questions
 )
+
+val bgColors = listOf(
+    Color(0xFF023047),
+    Color(0xFF780000),
+    Color(0xFF344e41),
+    Color(0xFF450920),
+)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun QuizScreen(navController: NavHostController) {
+    var randomQuestions by remember { mutableStateOf<List<String>>(emptyList()) }
+    var randomChoices by remember { mutableStateOf<List<List<String>>>(emptyList()) }
+    var randomCorrectAnswers by remember { mutableStateOf<List<Int>>(emptyList()) }
+    var userAnswers by remember { mutableStateOf(List<String?>(randomQuestions.size) { null }) }
 
-    // Randomly shuffle and take 4 questions
-    val randomQuestions = questions.shuffled().take(4)
-    val randomChoices = randomQuestions.mapIndexed { index, _ ->
-        choices[questions.indexOf(randomQuestions[index])].shuffled() // Shuffle the answers for each question
-    }
-    val randomCorrectAnswers = randomQuestions.mapIndexed { index, _ ->
-        val originalCorrectIndex = correctAnswers[questions.indexOf(randomQuestions[index])] - 1
-        val correctAnswer = choices[questions.indexOf(randomQuestions[index])][originalCorrectIndex]
-        randomChoices[index].indexOf(correctAnswer) + 1 // Add 1 to match your 1-based index
-    }
+    var currentQuestionIndex by remember { mutableIntStateOf(0) }
+    var timeLeft by remember { mutableIntStateOf(10) }
+
+    val scope = rememberCoroutineScope()
+    val lifecycleOwner: LifecycleOwner = LocalLifecycleOwner.current
+    val context = LocalContext.current
 
     // Track the current question index and the user's score
-    val currentQuestionIndex = remember { mutableStateOf(0) }
-    val score = remember { mutableStateOf(0) }
-
-
+    val score = remember { mutableIntStateOf(0) }
     // Track selected answer for the current question
     val selectedAnswer = remember { mutableStateOf<String?>(null) }
 
-    // Track the time left for each question (in seconds)
-    val timeLeft = remember { mutableStateOf(10) }
-
-    // State to track quiz completion
-    val quizEnded = remember { mutableStateOf(false) }
-
-    // Get context here, inside composable function
-    val context = LocalContext.current
-
-    val timer = remember { mutableStateOf<CountDownTimer?>(null) }
-
-    // Add this to your QuizScreen composable
-    val userAnswers = remember { mutableStateOf<List<String?>>(List(randomQuestions.size) { null }) }
-
     // Function to go to the next question
-    val goToNextQuestion: () -> Unit = {
-        if (selectedAnswer.value != null || timeLeft.value == 0) {
-
-            userAnswers.value = userAnswers.value.toMutableList().apply {
-                this[currentQuestionIndex.value] = selectedAnswer.value
+    fun goToNextQuestion() {
+        if (userAnswers.size > currentQuestionIndex) { // Check size before access
+            userAnswers = userAnswers.toMutableList().apply {
+                this[currentQuestionIndex] = selectedAnswer.value
             }
+        }
 
-            // Check if the selected answer is correct
-            val correctAnswerIndex = randomCorrectAnswers[currentQuestionIndex.value] - 1 // Convert to 0-based index
-            if (randomChoices[currentQuestionIndex.value].indexOf(selectedAnswer.value) == correctAnswerIndex) {
-                score.value += 1
-            }
-            // Go to the next question
-            if (currentQuestionIndex.value < randomQuestions.size - 1) {
-                currentQuestionIndex.value += 1
-                selectedAnswer.value = null
-                timeLeft.value = 10  // Reset time for next question
-            } else {
-                // End of quiz, save score and navigate to results screen
-                saveScore(context = context, score.value)
+        // Check if the selected answer is correct
+        val correctAnswerIndex =
+            randomCorrectAnswers[currentQuestionIndex]
 
-                // Serialize questions and choices
-                val serializedRandomQuestions = randomQuestions.joinToString("|")
-                val serializedRandomChoices = randomChoices.joinToString("|") { it.joinToString(",") }
+        if (selectedAnswer.value == randomChoices[currentQuestionIndex][correctAnswerIndex - 1]) {
+            score.value += 1
+        }
 
-                // Navigate to ScoreScreen with all required arguments
-                navController.navigate(
-                    "score/${score.value}/${randomQuestions.size}/" +
-                            "${userAnswers.value.joinToString("|")}/" +
-                            "${randomCorrectAnswers.joinToString("|")}/" +
-                            "$serializedRandomQuestions/$serializedRandomChoices"
-                )
-                quizEnded.value = true
-            }
+        Log.d("QuizScreen", "User Answers: $userAnswers")
+        Log.d("QuizScreen", "Score: ${score.intValue}")
+        // Go to the next question
+        if (currentQuestionIndex < randomQuestions.size - 1) {
+            currentQuestionIndex += 1
+            selectedAnswer.value = null
+            timeLeft = 10
+        } else {
+            // End of quiz, save score and navigate to results screen
+            saveScore(context = context, score.intValue)
+            saveIsPlayed(context = context, state = true)
+
+            // Serialize questions and choices
+            val serializedRandomQuestions = randomQuestions.joinToString("|")
+            val serializedRandomChoices =
+                randomChoices.joinToString("|") { it.joinToString(",") }
+
+            // Navigate to ScoreScreen with all required arguments
+            navController.navigate(
+                "score/${score.intValue}/${randomQuestions.size}/" +
+                        "${userAnswers.joinToString("|")}/" +
+                        "${randomCorrectAnswers.joinToString("|")}/" +
+                        "$serializedRandomQuestions/$serializedRandomChoices"
+            )
         }
     }
 
+    // Initialize questions and choices
+    LaunchedEffect(Unit) {
+        val randomIndexes = questions.indices.shuffled().take(4)
+        randomQuestions = randomIndexes.map { questions[it] }
+        randomChoices = randomIndexes.map { choices[it] }
+        randomCorrectAnswers = randomIndexes.map { correctAnswers[it] }
+        currentQuestionIndex = 0
+        userAnswers = List(randomQuestions.size) { null }
+
+        Log.d("QuizScreen", "Random Questions: $randomQuestions")
+        Log.d("QuizScreen", "Random Choices: $randomChoices")
+        Log.d("QuizScreen", "Random Correct Answers: $randomCorrectAnswers")
+
+        //        val originalCorrectIndex = correctAnswers[questions.indexOf(randomQuestions[index])] - 1
+//        val correctAnswer = choices[questions.indexOf(randomQuestions[index])][originalCorrectIndex]
+//          randomChoices[index].indexOf(correctAnswer) + 1 // Add 1 to match your 1-based index
+//          }
+    }
+
     // Timer logic
-
-    LaunchedEffect(currentQuestionIndex.value) {
-        // Cancel any previous timer before starting a new one
-        timer.value?.cancel()
-
-        // Start a new timer countdown for 10 seconds when the question changes
-        val newTimer = object : CountDownTimer(10 * 1000L, 1000) {
-            override fun onTick(millisUntilFinished: Long) {
-                timeLeft.value = (millisUntilFinished / 1000).toInt()
-            }
-
-            override fun onFinish() {
-                // When timer finishes, go to the next question
-                goToNextQuestion()
+    LaunchedEffect(currentQuestionIndex) {
+        timeLeft = 10
+        lifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            flow {
+                for (i in timeLeft downTo 0) {
+                    emit(i)
+                    delay(1000)
+                }
+            }.collect { time ->
+                timeLeft = time
+                if (time == 0) {
+                    goToNextQuestion()
+                }
             }
         }
-        // Start the new timer and store it
-        newTimer.start()
-        timer.value = newTimer
     }
 
     Scaffold(
         modifier = Modifier
-            .fillMaxWidth(),containerColor = colorsList[currentQuestionIndex.value % colorsList.size],
+            .fillMaxWidth(),
+        containerColor = bgColors[currentQuestionIndex],
         topBar = {
             TopAppBar(
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    titleContentColor = LightText,
+                    containerColor = Color.White,
+                    titleContentColor = DarkText,
                 ),
                 title = {
-                    Text("Quiz", fontSize = 20.sp, fontWeight = FontWeight(600))
+                    Text(
+                        "Quiz", fontSize = 28.sp,
+                        fontFamily =
+                        FontFamily(Font(R.font.jersey10_regular))
+                    )
                 },
                 navigationIcon = {
                     Button(
                         onClick = { navController.popBackStack() },
                         colors = ButtonDefaults.buttonColors(
-                            contentColor = LightText,
+                            contentColor = DarkText,
                             containerColor = Color.Transparent
                         )
                     ) {
@@ -243,12 +267,19 @@ fun QuizScreen(navController: NavHostController) {
                         )
                     }
                 },
-
-                )
+            )
         }
     ) { innerPadding ->
-        Column {
-            Column(
+        if (randomQuestions.isEmpty() || randomChoices.isEmpty())
+            Text(
+                modifier = Modifier.padding(innerPadding),
+                text = "Loading... ",
+                fontSize = 28.sp,
+                fontFamily = FontFamily(Font(R.font.jersey10_regular)),
+                color = LightText
+            )
+        else
+            LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(
@@ -257,55 +288,68 @@ fun QuizScreen(navController: NavHostController) {
                     ),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center,
-            ) {
-                Text(
-                    "Question ${currentQuestionIndex.value + 1}",
-                    fontSize = 20.sp, fontWeight = FontWeight(500), color = DarkText
-                )
-                Spacer(modifier = Modifier.padding(20.dp))
-                Text(
-                    randomQuestions[currentQuestionIndex.value],
-                    fontSize = 24.sp, fontWeight = FontWeight(500), color = DarkText
-                )
-                Spacer(modifier = Modifier.padding(20.dp))
+                content = {
+                    item {
 
-                // Display answer choices
-                val questionColor = colorsList[currentQuestionIndex.value % colorsList.size]
-                randomChoices[currentQuestionIndex.value].forEach { answer ->
-                    AnswerButton(
-                        answer = answer,
-                        isSelected = selectedAnswer.value == answer,
-                        onClick = { selectedAnswer.value = answer },
-                        buttonColor = questionColor
-                    )
-                    Spacer(modifier = Modifier.padding(10.dp))
-                }
+                        Text(
+                            text = "Question ${currentQuestionIndex + 1}",
+                            fontSize = 28.sp,
+                            fontFamily = FontFamily(Font(R.font.jersey10_regular)),
+                            color = LightText
+                        )
+                        Spacer(modifier = Modifier.padding(20.dp))
+                        Text(
+                            randomQuestions[currentQuestionIndex],
+                            fontSize = 32.sp,
+                            textAlign = TextAlign.Center,
+                            fontFamily = FontFamily(Font(R.font.jersey10_regular)),
+                            color = LightText
+                        )
+                        Spacer(modifier = Modifier.padding(20.dp))
+                        // Display answer choices
+                        randomChoices[currentQuestionIndex].forEach { answer ->
+                            AnswerButton(
+                                answer = answer,
+                                isSelected = selectedAnswer.value == answer,
+                                onClick = { selectedAnswer.value = answer },
+                                buttonColor = colorsList[currentQuestionIndex]
+                            )
+                            Spacer(modifier = Modifier.padding(10.dp))
+                        }
 
-                // Display timer
-                Text("Time Left: ${timeLeft.value}s", fontSize = 18.sp, color = DarkText)
+                        // Display timer
+                        Text(
+                            "Time Left: ${timeLeft}s", fontSize = 32.sp, color = LightText,
+                            fontFamily = FontFamily(Font(R.font.jersey10_regular))
+                        )
 
-                // Action buttons (Back and Next)
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Button(
-                        modifier = Modifier
-                            .padding(horizontal = 16.dp, vertical = 8.dp)
-                            .weight(1f),
-                        shape = RoundedCornerShape(8.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color.Transparent,
-                            contentColor = DarkText
-                        ),
-                        border = BorderStroke(width = 1.dp, color = DarkText),
-                        onClick = { goToNextQuestion() } // Direct call without navController or context
-                    ) {
-                        Text("Ok", fontSize = 16.sp, fontWeight = FontWeight(400))
+                        // Action buttons (Back and Next)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Button(
+                                modifier = Modifier
+                                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                                    .weight(1f),
+                                shape = RoundedCornerShape(8.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = Color.White,
+                                    contentColor = DarkText
+                                ),
+                                border = BorderStroke(width = 1.dp, color = DarkText),
+                                onClick = { goToNextQuestion() } // Direct call without navController or context
+                            ) {
+                                Text(
+                                    "OK",
+                                    fontSize = 28.sp,
+                                    fontFamily = FontFamily(Font(R.font.jersey10_regular))
+                                )
+                            }
+                        }
                     }
                 }
-            }
-        }
+            )
     }
 }
 
@@ -315,14 +359,14 @@ fun AnswerButton(answer: String, isSelected: Boolean, onClick: () -> Unit, butto
         onClick = onClick,
         modifier = Modifier
             .fillMaxWidth(),
-        contentPadding = PaddingValues(16.dp),
+        contentPadding = PaddingValues(vertical = 18.dp, horizontal = 24.dp),
         shape = RoundedCornerShape(8.dp),
-        border = BorderStroke(width = 1.dp, color = if (isSelected) Purple80 else DarkText),
+        border = BorderStroke(width = 1.dp, color = if (isSelected) Green else DarkText),
         colors = ButtonDefaults.buttonColors(
-            containerColor = if (isSelected) Purple80 else buttonColor, // Change background color here
-            contentColor = DarkText
+            containerColor = if (isSelected) Green else buttonColor, // Change background color here
+            contentColor = LightText
         )
     ) {
-        Text(answer, fontSize = 16.sp, fontWeight = FontWeight(400))
+        Text(answer, fontSize = 32.sp, fontFamily = FontFamily(Font(R.font.jersey10_regular)))
     }
 }
